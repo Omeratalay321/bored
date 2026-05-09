@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MilisBored Araba Yarışı</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #333; font-family: sans-serif; touch-action: none; }
+        
+        /* Yol ve Şeritler */
+        #oyun-alani { 
+            position: relative; width: 100vw; height: 100vh; 
+            background: #444; border-left: 10px solid white; border-right: 10px solid white;
+            box-sizing: border-box; overflow: hidden;
+        }
+        
+        .serit {
+            position: absolute; left: 50%; width: 10px; height: 100px;
+            background: white; transform: translateX(-50%);
+            animation: yolAksin 1s linear infinite;
+        }
+
+        @keyframes yolAksin {
+            from { top: -150px; }
+            to { top: 100%; }
+        }
+
+        /* Bizim Araba */
+        #oyuncu { 
+            position: absolute; bottom: 50px; left: 50%; 
+            width: 70px; height: 120px; 
+            background: #ff69b4; /* Pembe */
+            border-radius: 10px; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; color: white; text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 100;
+            transition: left 0.15s ease-out;
+        }
+
+        .cam { width: 50px; height: 20px; background: #87CEEB; margin: 5px; border-radius: 3px; }
+
+        /* Düşman Araçlar */
+        .dusman { 
+            position: absolute; width: 70px; height: 120px; 
+            background: #33ff33; border-radius: 10px; z-index: 50;
+        }
+
+        /* Göstergeler */
+        #skor { 
+            position: fixed; top: 20px; left: 20px; color: white;
+            font-size: 24px; font-weight: bold; z-index: 200;
+        }
+
+        #mesaj { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 30px; border-radius: 20px;
+            text-align: center; display: none; z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="skor">Skor: 0</div>
+    <div id="mesaj">
+        <h2 id="mesaj-baslik"></h2>
+        <button onclick="location.reload()" style="padding: 10px 20px; font-size: 18px;">Tekrar Dene</button>
+    </div>
+
+    <div id="oyun-alani">
+        <!-- Şeritler -->
+        <div class="serit" style="top: 0%"></div>
+        <div class="serit" style="top: 33%"></div>
+        <div class="serit" style="top: 66%"></div>
+
+        <div id="oyuncu">
+            <div class="cam"></div>
+            MilisBored
+            <div class="cam" style="margin-top: 40px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const oyuncu = document.getElementById('oyuncu');
+        const oyunAlani = document.getElementById('oyun-alani');
+        const skorYazisi = document.getElementById('skor');
+        const mesaj = document.getElementById('mesaj');
+        
+        let skor = 0;
+        let oyunDevam = true;
+        let oyuncuX = window.innerWidth / 2;
+
+        // Telefon Kontrolü (Sağa sola dokunma)
+        window.addEventListener('touchstart', (e) => {
+            if(!oyunDevam) return;
+            const dokunmaX = e.touches[0].clientX;
+            if(dokunmaX < window.innerWidth / 2) {
+                oyuncuX -= 60; // Sola git
+            } else {
+                oyuncuX += 60; // Sağa git
+            }
+            
+            // Sınırlar
+            if(oyuncuX < 40) oyuncuX = 40;
+            if(oyuncuX > window.innerWidth - 40) oyuncuX = window.innerWidth - 40;
+            
+            oyuncu.style.left = oyuncuX + "px";
+        });
+
+        // Düşman Araba Oluşturma
+        function dusmanUret() {
+            if(!oyunDevam) return;
+            const dusman = document.createElement('div');
+            dusman.className = 'dusman';
+            dusman.style.left = (Math.random() * (window.innerWidth - 80) + 40) + "px";
+            dusman.style.top = "-150px";
+            // Rastgele renk
+            const renkler = ['#ff3333', '#3333ff', '#ffff33', '#ffa500'];
+            dusman.style.background = renkler[Math.floor(Math.random() * renkler.length)];
+            
+            oyunAlani.appendChild(dusman);
+
+            let hiz = 5 + (skor / 10); // Skor arttıkça hızlanır
+            
+            let dusmanHareket = setInterval(() => {
+                if(!oyunDevam) {
+                    clearInterval(dusmanHareket);
+                    return;
+                }
+
+                let top = parseInt(dusman.style.top);
+                dusman.style.top = (top + hiz) + "px";
+
+                // Çarpışma Kontrolü
+                const dRect = dusman.getBoundingClientRect();
+                const oRect = oyuncu.getBoundingClientRect();
+
+                if (!(dRect.bottom < oRect.top || dRect.top > oRect.bottom || 
+                      dRect.right < oRect.left || dRect.left > oRect.right)) {
+                    oyunBitti();
+                }
+
+                // Ekrandan çıkınca sil ve puan ver
+                if(top > window.innerHeight) {
+                    dusman.remove();
+                    clearInterval(dusmanHareket);
+                    skor++;
+                    skorYazisi.innerText = "Skor: " + skor;
+                    
+                    if(skor === 20) {
+                        oyunKazandi();
+                    }
+                }
+            }, 20);
+        }
+
+        function oyunBitti() {
+            oyunDevam = false;
+            document.getElementById('mesaj-baslik').innerText = "Kaza Yaptın! Skor: " + skor;
+            mesaj.style.display = "block";
+        }
+
+        function oyunKazandi() {
+            oyunDevam = false;
+            document.getElementById('mesaj-baslik').innerText = "Aferin milisi iyice doyurdun şişti!";
+            mesaj.style.display = "block";
+        }
+
+        // Başlat
+        setInterval(dusmanUret, 1500);
+    </script>
+</body>
+</html>
